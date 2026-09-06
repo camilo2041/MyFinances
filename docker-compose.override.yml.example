@@ -1,0 +1,42 @@
+# Copia este archivo a "docker-compose.override.yml" (gitignored) para
+# desarrollo local. `docker compose` lo carga automáticamente y lo fusiona
+# sobre docker-compose.yml.
+#
+# Requisito (una sola vez):
+#     docker network create traefik-public
+#
+# Uso normal en local:
+#     docker compose up -d            # levanta db + api (puerto 8010)
+#     cd frontend && npm run dev      # frontend con hot-reload en :3000
+#
+# Para levantar también el frontend en contenedor:
+#     docker compose --profile web up -d
+
+services:
+  api:
+    # Recarga en caliente + código montado como volumen.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/code
+    ports:
+      - "8010:8000"
+    environment:
+      - CORS_ORIGINS=*
+      # Crea el usuario de ejemplo con datos precargados (solo local).
+      - DEMO_EMAIL=juan@myfinces.local
+      - DEMO_PASSWORD=demo1234
+    labels:
+      - "traefik.enable=false"
+
+  web:
+    # Opt-in: solo arranca con `--profile web`.
+    profiles: ["web"]
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8010
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=false"
+
+# La red externa se crea a mano en local (docker network create traefik-public).

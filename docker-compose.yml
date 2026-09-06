@@ -1,36 +1,91 @@
+# Configuración base = PRODUCCIÓN (detrás de Traefik).
+#
+#   - Los servicios NO exponen puertos al host; el tráfico entra por Traefik
+#     usando la red externa "traefik-public" y TLS (certresolver).
+#   - Postgres persiste en el volumen "db_data".
+#   - Los secretos son OBLIGATORIOS (${VAR:?...}): si faltan, `docker compose`
+#     se niega a arrancar en vez de desplegar con claves inseguras.
+#
+# En LOCAL, copia "docker-compose.override.yml.example" a
+# "docker-compose.override.yml" (gitignored): expone puertos, activa
+# --reload y monta el código. Requiere una sola vez:
+#     docker network create traefik-public
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: myfinces-db
+    restart: always
     environment:
-      POSTGRES_USER: myfinces
-      POSTGRES_PASSWORD: myfinces
-      POSTGRES_DB: myfinces
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-myfinces}
+      POSTGRES_USER: ${POSTGRES_USER:-myfinces}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en tu .env (ver .env.example)}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U myfinces"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myfinces} -d ${POSTGRES_DB:-myfinces}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - internal
 
   api:
-    build: ./backend
-    environment:
-      DATABASE_URL: postgresql+psycopg://myfinces:myfinces@db:5432/myfinces
-      SECRET_KEY: "cambia-esta-clave-en-produccion-0123456789abcdef"
-      ADMIN_EMAIL: "admin@myfinces.local"
-      ADMIN_PASSWORD: "admin1234"
-      DEMO_EMAIL: "juan@myfinces.local"
-      DEMO_PASSWORD: "demo1234"
-    ports:
-      - "8010:8000"
+    build:
+      context: ./backend
+    container_name: myfinces-api
+    restart: always
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/code
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-myfinces}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-myfinces}}
+      - SECRET_KEY=${SECRET_KEY:?Define SECRET_KEY en tu .env (ver .env.example)}
+      - TOKEN_TTL_HOURS=${TOKEN_TTL_HOURS:-168}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@myfinces.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Define ADMIN_PASSWORD en tu .env (ver .env.example)}
+      - DEMO_EMAIL=${DEMO_EMAIL:-}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://${DOMAIN}}
+    networks:
+      - internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.myfinces-api.rule=Host(`${DOMAIN:?Define DOMAIN en tu .env}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.myfinces-api.entrypoints=websecure"
+      - "traefik.http.routers.myfinces-api.tls=true"
+      - "traefik.http.routers.myfinces-api.tls.certresolver=${CERT_RESOLVER:-mi-resuelves-ssl}"
+      - "traefik.http.routers.myfinces-api.middlewares=myfinces-api-strip"
+      - "traefik.http.middlewares.myfinces-api-strip.stripprefix.prefixes=/api"
+      - "traefik.http.services.myfinces-api.loadbalancer.server.port=8000"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://${DOMAIN}/api}
+    container_name: myfinces-web
+    restart: always
+    depends_on:
+      - api
+    networks:
+      - internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.myfinces-web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.myfinces-web.entrypoints=websecure"
+      - "traefik.http.routers.myfinces-web.tls=true"
+      - "traefik.http.routers.myfinces-web.tls.certresolver=${CERT_RESOLVER:-mi-resuelves-ssl}"
+      - "traefik.http.services.myfinces-web.loadbalancer.server.port=3000"
 
 volumes:
   db_data:
+
+networks:
+  internal:
+  traefik-public:
+    external: true

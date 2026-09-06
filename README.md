@@ -3,53 +3,67 @@
 App sencilla para llevar el control de: **ingresos y egresos**, **gastos fijos recurrentes**,
 **deudas y cuotas**, y **presupuesto + metas de ahorro**. Moneda: COP.
 
-Stack: **FastAPI + PostgreSQL** (backend, en Docker) · **Next.js 14 + Tailwind** (frontend).
-Uso local, un solo usuario, sin login.
+Stack: **FastAPI + PostgreSQL** (backend) · **Next.js 14 + Tailwind** (frontend).
+Login con roles (admin / usuario), datos aislados por cuenta.
+
+`docker-compose.yml` está configurado para **producción detrás de Traefik**. Para
+desarrollo local usa `docker-compose.override.yml` (ver abajo).
 
 ---
 
-## Requisitos
+## Desarrollo local
 
-- Docker Desktop
-- Node.js 18+
-
-## Arranque
-
-**1. Backend + base de datos** (desde la raíz del proyecto):
+Requisitos: Docker Desktop y Node.js 18+.
 
 ```bash
+# una sola vez
+docker network create traefik-public
+cp docker-compose.override.yml.example docker-compose.override.yml
+cp .env.example .env      # ajusta si quieres; los valores por defecto sirven en local
+
+# base de datos + API (puerto 8010, con --reload)
+docker compose up -d
+
+# frontend con hot-reload
+cd frontend && npm install && npm run dev
+```
+
+- App: http://localhost:3000 · API: http://localhost:8010 · Docs: http://localhost:8010/docs
+- El override crea el usuario de ejemplo `juan@myfinces.local` / `demo1234` con datos precargados.
+- Para levantar el frontend también en contenedor: `docker compose --profile web up -d`
+
+## Producción (Traefik)
+
+Requiere un Traefik ya corriendo con la red externa `traefik-public` y un
+`certresolver` (ACME/Let's Encrypt). En el servidor:
+
+```bash
+git clone <repo> && cd myfinces
+cp .env.example .env      # RELLENA todo: DOMAIN, SECRET_KEY, contraseñas…
+# NO crees docker-compose.override.yml en el servidor
 docker compose up -d --build
 ```
 
-- API: http://localhost:8010 · Documentación interactiva: http://localhost:8010/docs
-- La primera vez crea las tablas y carga datos de ejemplo (categorías, un salario,
-  4 gastos fijos, 1 deuda, 1 meta de ahorro y 3 presupuestos).
-
-**2. Frontend:**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Abre http://localhost:3000
+- Traefik enruta `https://$DOMAIN` → frontend y `https://$DOMAIN/api` → API
+  (quita el prefijo `/api` con un middleware `stripprefix`).
+- `SECRET_KEY`, `POSTGRES_PASSWORD` y `ADMIN_PASSWORD` son **obligatorias**:
+  si faltan, `docker compose` no arranca.
+- Deja `DEMO_EMAIL` / `DEMO_PASSWORD` vacías para no crear datos de ejemplo.
+- Postgres persiste en el volumen `myfinces_db_data`.
+- `NEXT_PUBLIC_API_URL` se hornea en el build del frontend (`https://$DOMAIN/api`
+  por defecto); si cambias el dominio, reconstruye la imagen `web`.
 
 ## Acceso
 
-La app tiene login y roles. Al arrancar por primera vez se crean:
-
-| Rol | Correo | Contraseña |
-|---|---|---|
-| Administrador | `admin@myfinces.local` | `admin1234` |
-| Usuario (con datos de ejemplo) | `juan@myfinces.local` | `demo1234` |
+En el primer arranque se crea la cuenta **administrador** (email y contraseña
+salen de `ADMIN_EMAIL` / `ADMIN_PASSWORD` en `.env`; en local por defecto
+`admin@myfinces.local` / `admin1234`). En local, el override además crea
+`juan@myfinces.local` / `demo1234` con datos de ejemplo.
 
 - **Administrador**: entra a **Usuarios** (barra lateral) para crear, editar,
   activar/desactivar y eliminar las personas que manejan sus finanzas. Cada
   usuario nuevo arranca con su propio juego de categorías y sin movimientos.
 - **Usuario**: solo ve y gestiona **sus** finanzas; los datos están aislados por cuenta.
-
-Cambia las credenciales y `SECRET_KEY` en `docker-compose.yml` antes de usarlo en serio.
 
 ## Empezar de cero (borrar todo)
 
@@ -57,8 +71,7 @@ Cambia las credenciales y `SECRET_KEY` en `docker-compose.yml` antes de usarlo e
 docker compose down -v && docker compose up -d
 ```
 
-Se recrean el admin y el usuario demo. Sin `-v`, los datos existentes se conservan
-(al añadir el login, las filas previas se asignan al usuario demo automáticamente).
+Con `-v` se borra el volumen `myfinces_db_data`. Sin `-v`, los datos se conservan.
 
 ---
 

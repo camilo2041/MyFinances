@@ -4,6 +4,7 @@ node_modules/
 out/
 dist/
 build/
+.cache/
 
 # python
 __pycache__/
@@ -11,9 +12,10 @@ __pycache__/
 .venv/
 venv/
 
-# env
+# env / local overrides
 .env
 *.env.local
+docker-compose.override.yml
 
 # misc
 .DS_Store

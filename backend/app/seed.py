@@ -156,10 +156,11 @@ def seed_demo_data(db: Session, user: models.User) -> None:
 def ensure_bootstrap(db: Session) -> None:
     _add_user_columns()
 
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@myfinces.local")
-    admin_pass = os.getenv("ADMIN_PASSWORD", "admin1234")
-    demo_email = os.getenv("DEMO_EMAIL", "juan@myfinces.local")
-    demo_pass = os.getenv("DEMO_PASSWORD", "demo1234")
+    admin_email = (os.getenv("ADMIN_EMAIL") or "admin@myfinces.local").strip().lower()
+    admin_pass = os.getenv("ADMIN_PASSWORD") or "admin1234"
+    # El usuario demo (con datos de ejemplo) solo se crea si se pide explícitamente.
+    demo_email = (os.getenv("DEMO_EMAIL") or "").strip().lower()
+    demo_pass = os.getenv("DEMO_PASSWORD") or ""
 
     admin = db.execute(select(models.User).where(models.User.email == admin_email)).scalar_one_or_none()
     if not admin:
@@ -168,24 +169,28 @@ def ensure_bootstrap(db: Session) -> None:
         db.add(admin)
         db.commit()
 
-    demo = db.execute(select(models.User).where(models.User.email == demo_email)).scalar_one_or_none()
-    if not demo:
-        demo = models.User(email=demo_email, name="Juan Duarte",
-                           hashed_password=hash_password(demo_pass), role="user")
-        db.add(demo)
-        db.commit()
+    demo = None
+    if demo_email and demo_pass:
+        demo = db.execute(select(models.User).where(models.User.email == demo_email)).scalar_one_or_none()
+        if not demo:
+            demo = models.User(email=demo_email, name="Usuario de ejemplo",
+                               hashed_password=hash_password(demo_pass), role="user")
+            db.add(demo)
+            db.commit()
 
-    # Adopta filas huérfanas (de antes de la migración) para el usuario demo.
+    # Adopta filas huérfanas (de una migración previa) para el primer usuario disponible.
+    owner = demo or admin
     with engine.begin() as conn:
         for tbl in _TABLES_WITH_USER:
             conn.execute(
                 text(f"UPDATE {tbl} SET user_id = :uid WHERE user_id IS NULL"),
-                {"uid": demo.id},
+                {"uid": owner.id},
             )
 
-    # Si el usuario demo quedó sin categorías, cárgale los datos de ejemplo.
-    has_cats = db.execute(
-        select(models.Category.id).where(models.Category.user_id == demo.id).limit(1)
-    ).first()
-    if not has_cats:
-        seed_demo_data(db, demo)
+    # Datos de ejemplo solo para el usuario demo, si aún no tiene categorías.
+    if demo:
+        has_cats = db.execute(
+            select(models.Category.id).where(models.Category.user_id == demo.id).limit(1)
+        ).first()
+        if not has_cats:
+            seed_demo_data(db, demo)

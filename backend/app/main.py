@@ -1,3 +1,4 @@
+import os
 import time
 
 from fastapi import FastAPI
@@ -20,9 +21,12 @@ from .seed import ensure_bootstrap
 
 app = FastAPI(title="MyFinces API", version="2.0.0")
 
+_cors = os.getenv("CORS_ORIGINS", "*").strip()
+_origins = ["*"] if _cors in ("", "*") else [o.strip() for o in _cors.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
