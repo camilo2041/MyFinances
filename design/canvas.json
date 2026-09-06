@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Login.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Acceso" },
+    { "file": "Main.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 900, "title": "Resumen · shell con barra lateral" },
+    { "file": "Consejero.dc.html", "x": 3120, "y": 0, "w": 1440, "h": 900, "title": "Consejero" }
+  ],
+  "annotations": [
+    { "id": "n-login", "x": 0, "y": -150, "w": 460, "text": "Acceso. Panel de marca a la izquierda con un extracto tipo libro contable; formulario sobrio a la derecha. Botón secundario para crear cuenta." },
+    { "id": "n-main", "x": 1560, "y": -150, "w": 460, "text": "Shell de la aplicación: barra lateral fija (navy) con Operación + Asesoría, selector de periodo y usuario abajo. El Resumen se reordena como un libro de movimientos con cargos/abonos/saldo y cifras monoespaciadas." },
+    { "id": "n-consejero", "x": 3120, "y": -150, "w": 460, "text": "Consejero: informe tipo auditoría. Índice de salud financiera con subíndices, diagnóstico numerado, recomendaciones con impacto, proyección y caja de consulta (IA)." }
+  ],
+  "launch": { "view": "canvas" }
+}

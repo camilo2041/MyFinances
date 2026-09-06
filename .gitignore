@@ -1,0 +1,26 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env
+.env
+*.env.local
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# scratch
+design/_serve.mjs
+design/myfinces-*.html

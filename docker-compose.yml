@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: myfinces
+      POSTGRES_PASSWORD: myfinces
+      POSTGRES_DB: myfinces
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myfinces"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://myfinces:myfinces@db:5432/myfinces
+      SECRET_KEY: "cambia-esta-clave-en-produccion-0123456789abcdef"
+      ADMIN_EMAIL: "admin@myfinces.local"
+      ADMIN_PASSWORD: "admin1234"
+      DEMO_EMAIL: "juan@myfinces.local"
+      DEMO_PASSWORD: "demo1234"
+    ports:
+      - "8010:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/code
+
+volumes:
+  db_data:
