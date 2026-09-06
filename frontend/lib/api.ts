@@ -30,7 +30,9 @@ export async function api<T = any>(path: string, opts: RequestInit = {}): Promis
     cache: "no-store",
   });
 
-  if (res.status === 401) {
+  // 401 en una petición autenticada = la sesión murió → cerrar y redirigir.
+  // 401 sin token (p. ej. login con credenciales malas) = error normal.
+  if (res.status === 401 && token) {
     setToken(null);
     onUnauthorized?.();
     throw new Error("Sesión expirada");
