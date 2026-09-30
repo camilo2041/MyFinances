@@ -34,8 +34,17 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MyFinces — Control de finanzas personales",
-  description: "Ingresos, egresos, gastos fijos, deudas y metas de ahorro",
+  title: "MyFinces — Tu plata en claro, tus pagos a tiempo",
+  description:
+    "Finanzas personales sin enredos: controla ingresos y gastos, recibe avisos antes de cada cuota y gasto fijo, sal de deudas y cumple tus metas de ahorro. Gratis, en la web y en Android.",
+  icons: { icon: "/icon.png", apple: "/icon.png" },
+  openGraph: {
+    title: "MyFinces — Tu plata en claro, tus pagos a tiempo",
+    description: "Controla tus gastos, recibe avisos antes de cada pago y cumple tus metas. Gratis.",
+    images: ["/icon.png"],
+    locale: "es_CO",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

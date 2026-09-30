@@ -15,6 +15,7 @@ type Ctx = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   refresh: () => void;
 };
@@ -23,6 +24,7 @@ const AuthCtx = createContext<Ctx>({
   user: null,
   loading: true,
   login: async () => {},
+  register: async () => {},
   logout: () => {},
   refresh: () => {},
 });
@@ -65,13 +67,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }, []);
 
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    const res = await api<{ access_token: string; user: User }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
+    });
+    setToken(res.access_token);
+    setUser(res.user);
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
   }, []);
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, logout, refresh: loadMe }}>
+    <AuthCtx.Provider value={{ user, loading, login, register, logout, refresh: loadMe }}>
       {children}
     </AuthCtx.Provider>
   );

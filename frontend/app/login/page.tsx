@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { IconLogo, IconArrowRight } from "@/components/icons";
@@ -130,9 +131,15 @@ export default function LoginPage() {
             {!busy && <IconArrowRight />}
           </button>
 
-          <p className="mt-6 text-[11.5px] leading-relaxed text-ink-mute">
-            ¿No tienes cuenta? Un administrador debe crearla. Contacta a quien
-            administra MyFinces en tu organización.
+          <p className="mt-6 text-center text-[13px] text-ink-soft">
+            ¿No tienes cuenta?{" "}
+            <Link href="/registro" className="font-semibold text-gold hover:underline">
+              Créala gratis
+            </Link>
+            {" · "}
+            <Link href="/" className="text-ink-mute hover:underline">
+              Conocer MyFinces
+            </Link>
           </p>
         </form>
       </div>
