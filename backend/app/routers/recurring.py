@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import get_current_user
-from ..common import current_period
+from ..common import current_period, ensure_category
 from ..database import get_db
 
 router = APIRouter(prefix="/recurring-expenses", tags=["recurring"])
@@ -43,7 +43,9 @@ def create_recurring(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    obj = models.RecurringExpense(user_id=user.id, **payload.model_dump())
+    data = payload.model_dump()
+    data["category_id"] = ensure_category(db, user.id, "egreso", data["category_id"])
+    obj = models.RecurringExpense(user_id=user.id, **data)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -58,7 +60,9 @@ def update_recurring(
     user: models.User = Depends(get_current_user),
 ):
     obj = _owned(db, user, rid)
-    for k, v in payload.model_dump().items():
+    data = payload.model_dump()
+    data["category_id"] = ensure_category(db, user.id, "egreso", data["category_id"])
+    for k, v in data.items():
         setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
@@ -91,7 +95,7 @@ def pay_recurring(
         user_id=user.id,
         amount=obj.amount,
         kind="egreso",
-        category_id=obj.category_id,
+        category_id=ensure_category(db, user.id, "egreso", obj.category_id),
         note=f"Gasto fijo: {obj.name}",
         source_type="fijo",
         source_id=obj.id,

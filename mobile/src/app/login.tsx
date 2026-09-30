@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Button, Kicker, Press, T, warn } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { isStrongPassword, PASSWORD_RULES } from '@/lib/password';
 import { bioAvailable, bioLabel, consumeSkipAutoPrompt, getCreds, getLastEmail, isBioEnabled, type BioKind } from '@/lib/biometric';
 import { C, F, R } from '@/lib/theme';
 
@@ -47,7 +48,7 @@ export default function Login() {
   };
 
   const isRegister = mode === 'register';
-  const ready = isRegister ? name.trim().length >= 2 && !!email && password.length >= 6 : !!email && !!password;
+  const ready = isRegister ? name.trim().length >= 2 && !!email && isStrongPassword(password) : !!email && !!password;
 
   const switchMode = () => {
     setMode(isRegister ? 'login' : 'register');
@@ -67,7 +68,7 @@ export default function Login() {
       else await login(email.trim(), password);
     } catch (e: any) {
       warn();
-      setError(e.message === 'Error 401' ? 'Correo o contraseña incorrectos' : e.message === 'Error 422' ? 'Revisa los datos: nombre, correo y contraseña de 6+ caracteres' : e.message);
+      setError(e.message === 'Error 401' ? 'Correo o contraseña incorrectos' : e.message === 'Error 422' ? 'Revisa tu nombre y tu correo' : e.message);
     } finally {
       setBusy(false);
     }
@@ -139,13 +140,30 @@ export default function Login() {
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder={isRegister ? 'Contraseña (mínimo 6)' : 'Contraseña'}
+            placeholder={isRegister ? 'Crea una contraseña segura' : 'Contraseña'}
             placeholderTextColor={C.textMute}
             secureTextEntry
             autoComplete={isRegister ? 'new-password' : 'password'}
             onSubmitEditing={submit}
             style={styles.input}
           />
+          {isRegister && password.length > 0 && (
+            <Animated.View entering={FadeIn.duration(200)} style={styles.rules}>
+              {PASSWORD_RULES.map((r) => {
+                const ok = r.test(password);
+                return (
+                  <View key={r.label} style={styles.rule}>
+                    <View style={[styles.ruleDot, ok && { backgroundColor: C.income, borderColor: C.income }]}>
+                      {ok && <Icon name="check" size={10} color={C.bg} strokeWidth={3.2} />}
+                    </View>
+                    <T size={12.5} color={ok ? C.text : C.textMute}>
+                      {r.label}
+                    </T>
+                  </View>
+                );
+              })}
+            </Animated.View>
+          )}
           {error && (
             <T size={13} color={C.expense}>
               {error}
@@ -181,5 +199,8 @@ const styles = StyleSheet.create({
   hero: { letterSpacing: -2, lineHeight: 46, marginTop: 6 },
   input: { height: 56, borderRadius: R.md, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 18, color: C.text, fontFamily: F.medium, fontSize: 16 },
   switch: { alignItems: 'center', paddingVertical: 12 },
+  rules: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, columnGap: 14, paddingHorizontal: 4 },
+  rule: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ruleDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   bioBtn: { width: 54, height: 54, borderRadius: R.lg, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accent, alignItems: 'center', justifyContent: 'center' },
 });

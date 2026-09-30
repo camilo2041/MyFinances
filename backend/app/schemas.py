@@ -49,7 +49,7 @@ class TokenOut(BaseModel):
 class UserCreate(BaseModel):
     email: str
     name: str
-    password: str = Field(min_length=6)
+    password: str
     role: Role = "user"
 
     @field_validator("email")
@@ -61,7 +61,7 @@ class UserCreate(BaseModel):
 class RegisterIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: str
-    password: str = Field(min_length=6)
+    password: str
 
     @field_validator("email")
     @classmethod
@@ -78,7 +78,7 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[Role] = None
     is_active: Optional[bool] = None
-    password: Optional[str] = Field(default=None, min_length=6)
+    password: Optional[str] = None
 
 
 # ---------- Category ----------

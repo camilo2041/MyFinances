@@ -118,7 +118,9 @@ export type Recurring = {
   id: number;
   name: string;
   amount: number;
+  category_id: number | null;
   category: Category | null;
+  note: string;
   due_day: number;
   active: boolean;
   paid_this_period: boolean;
@@ -127,6 +129,9 @@ export type Debt = {
   id: number;
   name: string;
   lender: string;
+  principal: number;
+  start_date: string;
+  note: string;
   total_installments: number;
   paid_installments: number;
   installment_amount: number;
@@ -147,10 +152,11 @@ export type Goal = {
   target_amount: number;
   current_amount: number;
   target_date: string | null;
+  note: string;
   progress: number;
   remaining: number;
 };
-export type Budget = { id: number; category: Category; amount: number; spent: number; remaining: number; pct: number };
+export type Budget = { id: number; category_id: number; period: string | null; category: Category; amount: number; spent: number; remaining: number; pct: number };
 export type Dashboard = {
   period: string;
   income: number;

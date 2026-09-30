@@ -42,7 +42,9 @@ export type IconName =
   | 'cash'
   | 'tag'
   | 'eye'
-  | 'eyeOff';
+  | 'eyeOff'
+  | 'mic'
+  | 'stop';
 
 // Trazos a 1.8px, esquinas redondeadas: un solo lenguaje para toda la app.
 export function Icon({ name, size = 22, color = C.text, strokeWidth = 1.8 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {
@@ -189,6 +191,13 @@ export function Icon({ name, size = 22, color = C.text, strokeWidth = 1.8 }: { n
         </>
       )}
       {name === 'eyeOff' && <Path {...p} d="M4 4l16 16M9.9 5.8A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.4 7.4A16.6 16.6 0 0 0 2.5 12S6 18.5 12 18.5c1.5 0 2.9-.4 4.1-1M10 10a3 3 0 0 0 4 4" />}
+      {name === 'mic' && (
+        <>
+          <Rect {...p} x={9} y={3} width={6} height={11.5} rx={3} />
+          <Path {...p} d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+        </>
+      )}
+      {name === 'stop' && <Rect x={7} y={7} width={10} height={10} rx={2.5} fill={color} />}
       {name === 'trash' && <Path {...p} d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />}
     </Svg>
   );

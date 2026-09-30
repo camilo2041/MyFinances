@@ -85,3 +85,15 @@ export function dueInfo(dueDay: number) {
   const days = day - t.getDate();
   return { date, days, overdue: days < 0 };
 }
+
+/** Próximo vencimiento de una cuota de deuda. El backend decide si está atrasada
+ *  (tiene en cuenta la fecha de inicio); si no lo está y el día ya pasó, la
+ *  cuota que sigue es la del mes siguiente. */
+export function debtDue(dueDay: number, overdue: boolean, daysOverdue: number) {
+  if (overdue) return { days: -daysOverdue, overdue: true };
+  const { days } = dueInfo(dueDay);
+  if (days >= 0) return { days, overdue: false };
+  return { days: daysUntil(nextDue(dueDay, addDaysLocal(new Date(), 1))), overdue: false };
+}
+
+const addDaysLocal = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);

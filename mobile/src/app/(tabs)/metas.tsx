@@ -4,9 +4,11 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
-import { Bar, Card, Empty, ErrorLine, Money, Press, Ring, T } from '@/components/ui';
+import { NewCard, SectionHead } from '@/components/Section';
+import { Bar, Card, ErrorLine, Money, Press, Ring, T } from '@/components/ui';
 import { invalidate, useApi, type Budget, type Goal } from '@/lib/api';
 import { parseDate, short } from '@/lib/format';
+import { goEdit } from '@/lib/nav';
 import { C, R } from '@/lib/theme';
 
 function monthsLeft(date: string | null) {
@@ -47,14 +49,18 @@ export default function Metas() {
         </Card>
       )}
 
+      <SectionHead title="Metas de ahorro" action="Nueva meta" onPress={() => goEdit('meta')} first />
       <View style={{ gap: 10 }}>
-        {goals.data && goals.data.length === 0 && <Empty title="Sin metas de ahorro" hint="Crea una en la versión web y abónale desde aquí." />}
+        {goals.data && goals.data.length === 0 && (
+          <NewCard title="Crea tu primera meta" hint="Un viaje, un fondo de emergencia, la moto… y ve abonándole." onPress={() => goEdit('meta')} />
+        )}
         {(goals.data ?? []).map((g, i) => {
           const done = g.progress >= 100;
           const ml = monthsLeft(g.target_date);
           const perMonth = ml && !done ? g.remaining / Math.max(1, ml) : 0;
           return (
             <Animated.View key={g.id} entering={FadeInDown.delay(i * 50).duration(350)}>
+              <Press onPress={() => goEdit('meta', { id: g.id })} haptic={false} scaleTo={0.98}>
               <Card style={[{ gap: 12 }, done && { borderColor: C.accent }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <View style={{ flex: 1, gap: 2 }}>
@@ -82,24 +88,24 @@ export default function Metas() {
                   </T>
                 </View>
               </Card>
+              </Press>
             </Animated.View>
           );
         })}
       </View>
 
+      <SectionHead title="Presupuestos del mes" action="Nuevo" onPress={() => goEdit('presupuesto')} />
+      {budgets.data && sortedBudgets.length === 0 && (
+        <NewCard title="Ponle límite a una categoría" hint="Te avisamos al llegar al 80 % y si te pasas." onPress={() => goEdit('presupuesto')} />
+      )}
       {sortedBudgets.length > 0 && (
         <>
-          <View style={styles.sectionHead}>
-            <T size={18} weight="bold">
-              Presupuestos del mes
-            </T>
-          </View>
           <Card style={{ gap: 16 }}>
             {sortedBudgets.map((b) => {
               const over = b.pct >= 100;
               const near = b.pct >= 80;
               return (
-                <View key={b.id} style={{ gap: 7 }}>
+                <Press key={b.id} onPress={() => goEdit('presupuesto', { id: b.id })} haptic={false} scaleTo={0.98} style={{ gap: 7 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <T weight="medium" size={14}>
                       {b.category.name}
@@ -112,7 +118,7 @@ export default function Metas() {
                   <T size={11} color={over ? C.expense : C.textMute}>
                     {over ? `Te pasaste por ${short(-b.remaining)}` : `Quedan ${short(b.remaining)}`}
                   </T>
-                </View>
+                </Press>
               );
             })}
           </Card>
@@ -125,5 +131,4 @@ export default function Metas() {
 const styles = StyleSheet.create({
   total: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 14 },
   add: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 12, height: 34, borderRadius: R.full },
-  sectionHead: { marginTop: 26, marginBottom: 12 },
 });

@@ -53,7 +53,12 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       <View style={styles.bar}>
         {routes.slice(0, 2).map(item)}
-        <Press onPress={() => router.push('/nuevo')} style={styles.fabWrap} scaleTo={0.9}>
+        <Press
+          onPress={() => router.push('/nuevo')}
+          onLongPress={() => router.push({ pathname: '/nuevo', params: { voz: '1' } })}
+          style={styles.fabWrap}
+          scaleTo={0.9}
+          accessibilityHint="Mantén presionado para registrar por voz">
           <LinearGradient colors={[C.brandGlow, C.brand, C.brandDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
             <Icon name="plus" size={26} strokeWidth={2.4} color="#fff" />
           </LinearGradient>

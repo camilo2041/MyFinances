@@ -17,6 +17,33 @@ def period_bounds(period: str) -> tuple[date, date]:
     return start, end
 
 
+FALLBACK_CATEGORY = {"egreso": ("Otros gastos", "#918fa8", "💸"), "ingreso": ("Otros ingresos", "#4d7c0f", "➕")}
+
+
+def ensure_category(db: Session, user_id: int, kind: str, category_id: int | None, preferred: str | None = None) -> int:
+    """Ningún movimiento queda sin categoría: si no viene (o no es del usuario),
+    usa `preferred` (p. ej. "Deudas") o "Otros gastos"/"Otros ingresos",
+    creándola si el usuario la borró."""
+    if category_id:
+        cat = db.get(models.Category, category_id)
+        if cat and cat.user_id == user_id:
+            return cat.id
+    names = [n for n in (preferred, FALLBACK_CATEGORY[kind][0]) if n]
+    for name in names:
+        found = db.execute(
+            select(models.Category.id).where(
+                models.Category.user_id == user_id, models.Category.kind == kind, models.Category.name == name
+            )
+        ).scalar_one_or_none()
+        if found:
+            return found
+    name, color, icon = FALLBACK_CATEGORY[kind]
+    cat = models.Category(user_id=user_id, name=name, kind=kind, color=color, icon=icon)
+    db.add(cat)
+    db.flush()
+    return cat.id
+
+
 def debt_monthly_interest(debt: models.Debt, remaining_balance: float) -> float:
     """Interés estimado de un mes sobre el saldo pendiente (tasa E.A. -> mensual)."""
     rate = float(debt.annual_rate) / 100.0
@@ -41,10 +68,16 @@ def enrich_debt(debt: models.Debt, today: date | None = None) -> schemas.DebtOut
     handled_this_period = any(
         p.date.strftime("%Y-%m") == period for p in debt.payments
     )  # pago o aplazamiento en el mes
+    # Si la deuda se registró después del vencimiento de este mes, la primera
+    # cuota es la del mes siguiente: no puede estar atrasada todavía.
+    last_day = (date(today.year + (today.month == 12), today.month % 12 + 1, 1) - date.resolution).day
+    due_this_month = date(today.year, today.month, min(debt.due_day, last_day))
+    starts_after_due = bool(debt.start_date and debt.start_date >= due_this_month)
     overdue = bool(
         debt.active
         and remaining > 0
         and not handled_this_period
+        and not starts_after_due
         and today.day > debt.due_day
     )
     days_overdue = (today.day - debt.due_day) if overdue else 0

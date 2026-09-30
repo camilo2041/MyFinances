@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import get_current_user, hash_password, require_admin
+from ..auth import check_password_strength, get_current_user, hash_password, require_admin
 from ..database import get_db
 from ..seed import seed_categories
 
@@ -24,6 +24,7 @@ def create_user(
     email = payload.email.lower()
     if db.execute(select(models.User).where(models.User.email == email)).scalar_one_or_none():
         raise HTTPException(400, "Ya existe un usuario con ese correo")
+    check_password_strength(payload.password)
     user = models.User(
         email=email,
         name=payload.name,
@@ -52,6 +53,7 @@ def update_user(
 
     data = payload.model_dump(exclude_unset=True)
     if "password" in data and data["password"]:
+        check_password_strength(data["password"])
         user.hashed_password = hash_password(data.pop("password"))
     else:
         data.pop("password", None)

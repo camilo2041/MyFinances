@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import get_current_user
-from ..common import current_period, debt_monthly_interest, enrich_debt, period_bounds
+from ..common import current_period, debt_monthly_interest, enrich_debt, ensure_category, period_bounds
 from ..database import get_db
 
 router = APIRouter(prefix="/debts", tags=["debts"])
@@ -98,7 +98,7 @@ def pay_installment(
                 date=payload.date,
                 amount=amount,
                 kind="egreso",
-                category_id=None,
+                category_id=ensure_category(db, user.id, "egreso", None, preferred="Deudas"),
                 note=f"Cuota deuda: {obj.name} ({obj.paid_installments}/{obj.total_installments})",
                 source_type="deuda",
                 source_id=obj.id,

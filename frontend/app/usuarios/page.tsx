@@ -166,7 +166,7 @@ export default function Usuarios() {
           </div>
           <div>
             <label className="label">Contraseña temporal</label>
-            <input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="mín. 6 caracteres" />
+            <input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="10+ con mayúscula, minúscula, número y símbolo" />
           </div>
           <div>
             <label className="label">Rol</label>

@@ -1,18 +1,23 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
 import { Keypad } from '@/components/Keypad';
+import { VoiceListener } from '@/components/VoiceListener';
 import { Button, Kicker, Press, T, success, warn } from '@/components/ui';
 import { api, invalidate, useApi, type Budget, type Category, type Kind } from '@/lib/api';
 import { evaluate, hasOp, pretty } from '@/lib/calc';
 import { catIcon } from '@/lib/catIcon';
+import { goEdit } from '@/lib/nav';
 import { isoDate, num } from '@/lib/format';
 import { ask, toast } from '@/lib/dialog';
+import { fallbackCategory, guessCategory } from '@/lib/guess';
 import { budgetAlert } from '@/lib/notify';
+import { storage } from '@/lib/storage';
+import { parseSpeech, type VoiceItem } from '@/lib/voice';
 import { C, F, R } from '@/lib/theme';
 
 const DAY_OPTS = [
@@ -20,6 +25,9 @@ const DAY_OPTS = [
   { label: 'Ayer', offset: 1 },
   { label: 'Anteayer', offset: 2 },
 ];
+const LAST_CAT_KEY = (k: Kind) => `myfinces_lastcat_${k}`;
+const dayName = (offset: number) => DAY_OPTS.find((o) => o.offset === offset)?.label ?? `Hace ${offset} días`;
+
 const dateFor = (offset: number) => {
   const d = new Date();
   d.setDate(d.getDate() - offset);
@@ -36,7 +44,7 @@ function Caret({ color }: { color: string }) {
 }
 
 export default function Nuevo() {
-  const p = useLocalSearchParams<{ id?: string; amount?: string; kind?: Kind; cat?: string; note?: string; date?: string }>();
+  const p = useLocalSearchParams<{ id?: string; amount?: string; kind?: Kind; cat?: string; note?: string; date?: string; voz?: string }>();
   const editing = !!p.id;
   const insets = useSafeAreaInsets();
   const cats = useApi<Category[]>('/categories');
@@ -47,6 +55,11 @@ export default function Nuevo() {
   const [note, setNote] = useState(p.note ?? '');
   const [date, setDate] = useState(p.date ?? dateFor(0));
   const [saving, setSaving] = useState(false);
+  const [listening, setListening] = useState(p.voz === '1');
+  const [lastCat, setLastCat] = useState<Partial<Record<Kind, number>>>({});
+  // Mientras el usuario no toque una categoría, la elegimos por él (según la nota).
+  const catTouched = useRef(!!p.cat);
+  const tilesRef = useRef<ScrollView>(null);
 
   const list = useMemo(() => (cats.data ?? []).filter((c) => c.kind === kind), [cats.data, kind]);
   const cat = list.find((c) => c.id === catId);
@@ -54,10 +67,111 @@ export default function Nuevo() {
   const value = evaluate(amount);
   const calculating = hasOp(amount);
 
+  // Última categoría usada por tipo (para preseleccionarla).
+  useEffect(() => {
+    Promise.all([storage.get(LAST_CAT_KEY('egreso')), storage.get(LAST_CAT_KEY('ingreso'))])
+      .then(([e, i]) => setLastCat({ egreso: e ? Number(e) : undefined, ingreso: i ? Number(i) : undefined }))
+      .catch(() => {});
+  }, []);
+
+  /** Mejor categoría para un texto: la que sugiere → la última usada → "Otros". */
+  const pick = (text: string, k: Kind) => {
+    const all = cats.data ?? [];
+    return guessCategory(text, k, all) ?? all.find((c) => c.id === lastCat[k] && c.kind === k) ?? fallbackCategory(k, all);
+  };
+
+  // Siempre hay una categoría elegida.
+  useEffect(() => {
+    if (!cats.data || (catId && list.some((c) => c.id === catId))) return;
+    const c = pick(note, kind);
+    if (c) setCatId(c.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cats.data, kind, lastCat, list]);
+
+  // Lleva a la vista la categoría elegida.
+  useEffect(() => {
+    const idx = list.findIndex((c) => c.id === catId);
+    if (idx >= 0) tilesRef.current?.scrollTo({ x: Math.max(0, idx * 86 - 110), animated: true });
+  }, [catId, list]);
+
+  const onNote = (t: string) => {
+    setNote(t);
+    if (catTouched.current) return;
+    const g = guessCategory(t, kind, cats.data ?? []);
+    if (g) setCatId(g.id);
+  };
+
+  const chooseCat = (id: number) => {
+    catTouched.current = true;
+    setCatId(id);
+  };
+
   const switchKind = (k: Kind) => {
     if (k === kind) return;
+    catTouched.current = false;
     setKind(k);
-    setCatId(null);
+    setCatId(pick(note, k)?.id ?? null);
+  };
+
+  const rememberCat = (k: Kind, id: number | null) => {
+    if (id) storage.set(LAST_CAT_KEY(k), String(id)).catch(() => {});
+  };
+
+  /** Guarda uno o varios movimientos dictados de una vez. */
+  const saveMany = async (items: (VoiceItem & { catId: number | null })[]) => {
+    for (const it of items) {
+      await api('/transactions', { method: 'POST', body: { amount: it.amount, kind: it.kind, category_id: it.catId, note: it.note, date: dateFor(it.dayOffset) } });
+      rememberCat(it.kind, it.catId);
+    }
+    success();
+    invalidate();
+    router.back();
+    toast(items.length === 1 ? (items[0].kind === 'egreso' ? 'Gasto registrado' : 'Ingreso registrado') : `${items.length} movimientos registrados`, 'ok');
+  };
+
+  /** Lo dictado → formulario lleno + confirmación para guardar de una. */
+  const onVoice = (text: string) => {
+    setListening(false);
+    const items = parseSpeech(text, kind).map((it) => ({ ...it, catId: pick(`${it.note} ${it.text}`, it.kind)?.id ?? null }));
+    if (!items.length) {
+      warn();
+      return toast('No escuché un monto. Prueba: "gasté 20 mil en taxi"', 'error');
+    }
+    const catName = (id: number | null) => (cats.data ?? []).find((c) => c.id === id)?.name ?? 'Sin categoría';
+    if (items.length === 1) {
+      const it = items[0];
+      catTouched.current = false;
+      setKind(it.kind);
+      setAmount(String(it.amount));
+      setNote(it.note);
+      setDate(dateFor(it.dayOffset));
+      setCatId(it.catId);
+      return ask({
+        title: it.kind === 'egreso' ? 'Registrar gasto' : 'Registrar ingreso',
+        message: `"${text}"`,
+        icon: 'mic',
+        rows: [
+          { label: 'Monto', value: `$${num(it.amount)}` },
+          { label: 'Nota', value: it.note || '—' },
+          { label: 'Categoría', value: catName(it.catId) },
+          { label: 'Fecha', value: dayName(it.dayOffset) },
+        ],
+        confirmText: 'Guardar',
+        cancelText: 'Corregir',
+        onConfirm: () => saveMany(items),
+      });
+    }
+    ask({
+      title: `Registrar ${items.length} movimientos`,
+      message: `"${text}"`,
+      icon: 'mic',
+      rows: items.map((it) => ({
+        label: `${it.kind === 'egreso' ? '↓' : '↑'} ${it.note || catName(it.catId)} · ${catName(it.catId)}`,
+        value: `$${num(it.amount)}`,
+      })),
+      confirmText: 'Guardar todos',
+      onConfirm: () => saveMany(items),
+    });
   };
 
   const save = async () => {
@@ -65,6 +179,7 @@ export default function Nuevo() {
     setSaving(true);
     try {
       const body = { amount: value, kind, category_id: catId, note: note.trim(), date };
+      rememberCat(kind, catId);
       const before = kind === 'egreso' ? await api<Budget[]>('/budgets').catch(() => []) : [];
       if (editing) await api(`/transactions/${p.id}`, { method: 'PUT', body });
       else await api('/transactions', { method: 'POST', body });
@@ -115,7 +230,9 @@ export default function Nuevo() {
             <Icon name="trash" size={19} color={C.expense} />
           </Press>
         ) : (
-          <View style={{ width: 42 }} />
+          <Press onPress={() => setListening(true)} style={[styles.round, styles.micBtn]} accessibilityLabel="Registrar por voz">
+            <Icon name="mic" size={20} color="#fff" strokeWidth={2} />
+          </Press>
         )}
       </View>
 
@@ -162,7 +279,7 @@ export default function Nuevo() {
           </View>
           <TextInput
             value={note}
-            onChangeText={setNote}
+            onChangeText={onNote}
             placeholder={kind === 'egreso' ? '¿En qué? (almuerzo, taxi…)' : '¿De dónde? (salario, venta…)'}
             placeholderTextColor={C.textMute}
             style={styles.note}
@@ -179,11 +296,11 @@ export default function Nuevo() {
             </T>
           )}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.tiles}>
+        <ScrollView ref={tilesRef} horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.tiles}>
           {list.map((c) => {
             const on = c.id === catId;
             return (
-              <Press key={c.id} onPress={() => setCatId(on ? null : c.id)} style={[styles.tile, on && { backgroundColor: tint + '1a', borderColor: tint }]} scaleTo={0.93}>
+              <Press key={c.id} onPress={() => chooseCat(c.id)} style={[styles.tile, on && { backgroundColor: tint + '1a', borderColor: tint }]} scaleTo={0.93}>
                 <View style={[styles.tileIcon, on && { backgroundColor: tint }]}>
                   <Icon name={catIcon(c.name)} size={22} color={on ? C.bg : C.textDim} strokeWidth={1.9} />
                 </View>
@@ -193,6 +310,14 @@ export default function Nuevo() {
               </Press>
             );
           })}
+          <Press onPress={() => goEdit('categoria', { kind })} style={styles.tile} scaleTo={0.93}>
+            <View style={[styles.tileIcon, styles.tileNew]}>
+              <Icon name="plus" size={20} color={C.glow} />
+            </View>
+            <T size={11.5} weight="medium" color={C.glow} style={styles.tileLabel}>
+              Nueva
+            </T>
+          </Press>
         </ScrollView>
 
         {/* Fecha */}
@@ -224,10 +349,11 @@ export default function Nuevo() {
           title={editing ? 'Guardar cambios' : kind === 'egreso' ? 'Guardar gasto' : 'Guardar ingreso'}
           onPress={save}
           loading={saving}
-          disabled={!value}
+          disabled={!value || !catId}
           icon={<Icon name="check" size={18} strokeWidth={2.4} color={C.onAccent} />}
         />
       </View>
+      {listening && <VoiceListener onResult={onVoice} onClose={() => setListening(false)} />}
     </View>
   );
 }
@@ -235,6 +361,7 @@ export default function Nuevo() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  micBtn: { backgroundColor: C.brand },
   round: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
   kinds: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 14 },
   kindCard: {
@@ -258,6 +385,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 14, marginBottom: 8 },
   tiles: { gap: 8, paddingHorizontal: 16 },
   tile: { width: 78, paddingVertical: 10, paddingHorizontal: 4, borderRadius: R.lg, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', gap: 7 },
+  tileNew: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: C.glow, borderStyle: 'dashed' },
   tileIcon: { width: 50, height: 50, borderRadius: 25, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
   tileLabel: { textAlign: 'center', lineHeight: 14, minHeight: 28 },
   dates: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },

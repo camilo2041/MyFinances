@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..auth import get_current_user
-from ..common import period_bounds
+from ..common import ensure_category, period_bounds
 from ..database import get_db
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -42,7 +42,9 @@ def create_transaction(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    obj = models.Transaction(user_id=user.id, **payload.model_dump())
+    data = payload.model_dump()
+    data["category_id"] = ensure_category(db, user.id, data["kind"], data["category_id"])
+    obj = models.Transaction(user_id=user.id, **data)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -64,7 +66,9 @@ def update_transaction(
     user: models.User = Depends(get_current_user),
 ):
     obj = _owned(db, user, tx_id)
-    for k, v in payload.model_dump().items():
+    data = payload.model_dump()
+    data["category_id"] = ensure_category(db, user.id, data["kind"], data["category_id"])
+    for k, v in data.items():
         setattr(obj, k, v)
     db.commit()
     db.refresh(obj)

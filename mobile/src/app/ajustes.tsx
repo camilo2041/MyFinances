@@ -228,6 +228,30 @@ export default function Ajustes() {
       )}
 
       <View style={styles.sectionHead}>
+        <Kicker>Organizar</Kicker>
+      </View>
+      <Card style={{ paddingVertical: 4 }}>
+        {[
+          { icon: 'tag' as const, title: 'Categorías', hint: 'Crea, renombra o elimina', go: () => router.push('/categorias') },
+          { icon: 'target' as const, title: 'Metas y presupuestos', hint: 'Ahorro y límites de gasto', go: () => router.navigate('/metas') },
+          { icon: 'calendar' as const, title: 'Gastos fijos y deudas', hint: 'Lo que pagas cada mes', go: () => router.navigate('/pagos') },
+        ].map((o, i) => (
+          <Press key={o.title} onPress={o.go} haptic={false} scaleTo={0.98} style={[styles.linkRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.lineSoft }]}>
+            <View style={styles.linkIcon}>
+              <Icon name={o.icon} size={19} color={C.glow} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <T weight="medium">{o.title}</T>
+              <T size={12} color={C.textMute}>
+                {o.hint}
+              </T>
+            </View>
+            <Icon name="chevronRight" size={18} color={C.textMute} />
+          </Press>
+        ))}
+      </Card>
+
+      <View style={styles.sectionHead}>
         <Kicker>Cuenta</Kicker>
       </View>
       <Button title="Cerrar sesión" variant="danger" onPress={confirmLogout} icon={<Icon name="logout" size={18} color={C.expense} />} />
@@ -261,6 +285,8 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 26, marginBottom: 10, paddingHorizontal: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
   hours: { flexDirection: 'row', gap: 6, paddingBottom: 14 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  linkIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
   leadBox: { borderTopWidth: 1, borderTopColor: C.lineSoft, paddingTop: 14, gap: 4 },
   hour: { flex: 1, height: 34, borderRadius: R.sm, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
   hourOn: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accent },

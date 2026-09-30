@@ -69,6 +69,8 @@ function Root() {
           <Stack.Screen name="nuevo" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="abonar" options={{ presentation: 'transparentModal', animation: 'fade' }} />
           <Stack.Screen name="ajustes" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="categorias" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="editar/[tipo]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         </Stack.Protected>
         <Stack.Protected guard={!user}>
           <Stack.Screen name="login" />

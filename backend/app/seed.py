@@ -194,3 +194,21 @@ def ensure_bootstrap(db: Session) -> None:
         ).first()
         if not has_cats:
             seed_demo_data(db, demo)
+
+    fix_uncategorized(db)
+
+
+def fix_uncategorized(db: Session) -> None:
+    """Asigna categoría a movimientos y gastos fijos que quedaron sin ella:
+    cuotas de deuda → "Deudas"; el resto → "Otros gastos" / "Otros ingresos"."""
+    from .common import ensure_category  # evita import circular
+
+    loose = db.execute(select(models.Transaction).where(models.Transaction.category_id.is_(None))).scalars().all()
+    for tx in loose:
+        preferred = "Deudas" if tx.source_type == "deuda" else None
+        tx.category_id = ensure_category(db, tx.user_id, tx.kind, None, preferred=preferred)
+    fixed = db.execute(select(models.RecurringExpense).where(models.RecurringExpense.category_id.is_(None))).scalars().all()
+    for r in fixed:
+        r.category_id = ensure_category(db, r.user_id, "egreso", None)
+    if loose or fixed:
+        db.commit()

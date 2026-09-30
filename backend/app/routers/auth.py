@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import create_token, get_current_user, hash_password, verify_password
+from ..auth import check_password_strength, create_token, get_current_user, hash_password, verify_password
 from ..database import get_db
 from ..seed import seed_categories
 
@@ -33,6 +33,7 @@ def register(payload: schemas.RegisterIn, db: Session = Depends(get_db)):
         raise HTTPException(403, "El registro está deshabilitado")
     if db.execute(select(models.User).where(models.User.email == payload.email)).scalar_one_or_none():
         raise HTTPException(400, "Ya existe una cuenta con ese correo")
+    check_password_strength(payload.password)
     user = models.User(
         email=payload.email,
         name=payload.name,

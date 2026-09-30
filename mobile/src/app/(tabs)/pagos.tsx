@@ -4,11 +4,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
-import { Bar, Card, Empty, ErrorLine, Money, Press, Segmented, T, success } from '@/components/ui';
+import { NewCard } from '@/components/Section';
+import { Bar, Card, ErrorLine, Money, Press, Segmented, T, success } from '@/components/ui';
 import { api, invalidate, useApi, type Debt, type Recurring } from '@/lib/api';
 import { celebrate } from '@/lib/celebrate';
 import { ask, toast } from '@/lib/dialog';
-import { dueInfo, money, short } from '@/lib/format';
+import { debtDue, dueInfo, money, short } from '@/lib/format';
+import { goEdit } from '@/lib/nav';
 import { C, R } from '@/lib/theme';
 
 type Tab = 'fijos' | 'deudas';
@@ -20,13 +22,22 @@ function dueText(dueDay: number, paid: boolean) {
   return days === 0 ? 'Vence hoy' : days === 1 ? 'Vence mañana' : `Vence el ${dueDay} · en ${days} días`;
 }
 
+function debtDueText(d: Debt) {
+  const { days, overdue } = debtDue(d.due_day, d.overdue, d.days_overdue);
+  if (overdue) return `Venció el ${d.due_day} · hace ${-days} d`;
+  return days === 0 ? 'Vence hoy' : days === 1 ? 'Vence mañana' : `Vence el ${d.due_day} · en ${days} días`;
+}
+
 export default function Pagos() {
   const [tab, setTab] = useState<Tab>('fijos');
   const rec = useApi<Recurring[]>('/recurring-expenses');
   const debts = useApi<Debt[]>('/debts');
 
-  const recurring = (rec.data ?? []).filter((r) => r.active).sort((a, b) => Number(a.paid_this_period) - Number(b.paid_this_period) || a.due_day - b.due_day);
-  const activeDebts = (debts.data ?? []).filter((d) => d.active && d.remaining_installments > 0).sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.due_day - b.due_day);
+  // Activos primero (pendientes antes que pagados); los pausados al final para poder reactivarlos.
+  const allFixed = [...(rec.data ?? [])].sort((a, b) => Number(!a.active) - Number(!b.active) || Number(a.paid_this_period) - Number(b.paid_this_period) || a.due_day - b.due_day);
+  const recurring = allFixed.filter((r) => r.active);
+  const allDebts = (debts.data ?? []).filter((d) => d.remaining_installments > 0).sort((a, b) => Number(!a.active) - Number(!b.active) || Number(b.overdue) - Number(a.overdue) || a.due_day - b.due_day);
+  const activeDebts = allDebts.filter((d) => d.active);
 
   const pendingFixed = recurring.filter((r) => !r.paid_this_period).reduce((s, r) => s + r.amount, 0);
   const paidFixed = recurring.filter((r) => r.paid_this_period).reduce((s, r) => s + r.amount, 0);
@@ -86,7 +97,19 @@ export default function Pagos() {
   const error = rec.error || debts.error;
 
   return (
-    <Screen kicker="Este mes" title="Pagos" refreshing={(rec.loading || debts.loading) && !!rec.data} onRefresh={invalidate}>
+    <Screen
+      kicker="Este mes"
+      title="Pagos"
+      refreshing={(rec.loading || debts.loading) && !!rec.data}
+      onRefresh={invalidate}
+      right={
+        <Press onPress={() => goEdit(tab === 'fijos' ? 'fijo' : 'deuda')} style={styles.addBtn} accessibilityLabel={tab === 'fijos' ? 'Nuevo gasto fijo' : 'Nueva deuda'}>
+          <Icon name="plus" size={16} strokeWidth={2.4} color={C.onAccent} />
+          <T size={13} weight="semi" color={C.onAccent}>
+            {tab === 'fijos' ? 'Fijo' : 'Deuda'}
+          </T>
+        </Press>
+      }>
       {error && !rec.data && <ErrorLine msg={error} onRetry={invalidate} />}
 
       <View style={styles.summary}>
@@ -114,12 +137,13 @@ export default function Pagos() {
 
       <View style={{ gap: 10, marginTop: 14 }}>
         {tab === 'fijos' &&
-          (recurring.length === 0 ? (
-            <Empty title="Sin gastos fijos" hint="Créalos desde la versión web; aquí te avisamos antes de cada vencimiento." />
+          (allFixed.length === 0 ? (
+            <NewCard title="Agrega tu primer gasto fijo" hint="Arriendo, servicios, suscripciones… te avisamos antes de que venzan." onPress={() => goEdit('fijo')} />
           ) : (
-            recurring.map((r, i) => (
+            allFixed.map((r, i) => (
               <Animated.View key={r.id} entering={FadeInDown.delay(i * 40).duration(350)}>
-                <Card style={[styles.row, r.paid_this_period && { opacity: 0.55 }]}>
+                <Press onPress={() => goEdit('fijo', { id: r.id })} haptic={false} scaleTo={0.98}>
+                <Card style={[styles.row, (r.paid_this_period || !r.active) && { opacity: 0.55 }]}>
                   <View style={[styles.day, r.paid_this_period && { backgroundColor: C.accentSoft }, !r.paid_this_period && dueInfo(r.due_day).overdue && { backgroundColor: C.expenseSoft }]}>
                     {r.paid_this_period ? (
                       <Icon name="check" size={18} color={C.income} strokeWidth={2.4} />
@@ -134,25 +158,27 @@ export default function Pagos() {
                       {r.name}
                     </T>
                     <T size={12} color={C.textMute}>
-                      {dueText(r.due_day, r.paid_this_period)}
+                      {r.active ? dueText(r.due_day, r.paid_this_period) : 'Pausado · toca para reactivarlo'}
                     </T>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     <Money value={r.amount} size={15} />
-                    {!r.paid_this_period && <SmallBtn label="Pagar" onPress={() => payFixed(r)} />}
+                    {r.active && !r.paid_this_period && <SmallBtn label="Pagar" onPress={() => payFixed(r)} />}
                   </View>
                 </Card>
+                </Press>
               </Animated.View>
             ))
           ))}
 
         {tab === 'deudas' &&
-          (activeDebts.length === 0 ? (
-            <Empty title="Sin deudas activas" hint="Nada que perseguir. Así se ve la libertad." />
+          (allDebts.length === 0 ? (
+            <NewCard title="Sin deudas activas" hint="¿Tienes un crédito, tarjeta o préstamo? Agrégalo y te avisamos de cada cuota." onPress={() => goEdit('deuda')} />
           ) : (
-            activeDebts.map((d, i) => (
+            allDebts.map((d, i) => (
               <Animated.View key={d.id} entering={FadeInDown.delay(i * 50).duration(350)}>
-                <Card style={[{ gap: 12 }, d.overdue && { borderColor: C.expense }]}>
+                <Press onPress={() => goEdit('deuda', { id: d.id })} haptic={false} scaleTo={0.98}>
+                <Card style={[{ gap: 12 }, d.overdue && d.active && { borderColor: C.expense }, !d.active && { opacity: 0.55 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
                     <View style={{ flex: 1, gap: 3 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -169,7 +195,7 @@ export default function Pagos() {
                       </View>
                       <T size={12} color={C.textMute}>
                         {d.lender ? `${d.lender} · ` : ''}
-                        {d.paid_this_period ? 'Cuota del mes pagada' : dueText(d.due_day, false)}
+                        {!d.active ? 'Pausada · toca para reactivarla' : d.paid_this_period ? 'Cuota del mes pagada' : debtDueText(d)}
                         {d.annual_rate ? ` · ${d.annual_rate}% EA` : ''}
                       </T>
                     </View>
@@ -193,7 +219,7 @@ export default function Pagos() {
                     </View>
                   </View>
 
-                  {!d.paid_this_period && (
+                  {d.active && !d.paid_this_period && (
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <Press onPress={() => payDebt(d)} style={[styles.action, { backgroundColor: C.accent, flex: 1 }]}>
                         <Icon name="check" size={16} strokeWidth={2.2} color={C.onAccent} />
@@ -210,6 +236,7 @@ export default function Pagos() {
                     </View>
                   )}
                 </Card>
+                </Press>
               </Animated.View>
             ))
           ))}
@@ -239,6 +266,7 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', gap: 12, backgroundColor: C.surface, borderRadius: R.lg, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.lineSoft },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
   day: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.accent, paddingHorizontal: 14, height: 38, borderRadius: R.full, marginBottom: 4 },
   small: { backgroundColor: C.accent, paddingHorizontal: 14, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   late: { backgroundColor: C.expenseSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   action: { height: 44, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },

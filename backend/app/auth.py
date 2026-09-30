@@ -17,6 +17,27 @@ TOKEN_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", "168"))  # 7 días
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
+PASSWORD_MIN_LEN = 10
+
+
+def check_password_strength(plain: str) -> None:
+    """Política de contraseñas: mínimo 10 caracteres con mayúscula, minúscula,
+    número y símbolo. Se aplica al crear o cambiar una contraseña (no al entrar)."""
+    missing = []
+    if len(plain) < PASSWORD_MIN_LEN:
+        missing.append(f"al menos {PASSWORD_MIN_LEN} caracteres")
+    if not any(c.isupper() for c in plain):
+        missing.append("una mayúscula")
+    if not any(c.islower() for c in plain):
+        missing.append("una minúscula")
+    if not any(c.isdigit() for c in plain):
+        missing.append("un número")
+    if not any(not c.isalnum() and not c.isspace() for c in plain):
+        missing.append("un símbolo")
+    if missing:
+        raise HTTPException(400, "La contraseña necesita " + ", ".join(missing))
+
+
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 

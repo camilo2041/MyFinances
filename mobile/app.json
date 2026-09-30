@@ -54,6 +54,13 @@
         {
           "faceIDPermission": "MyFinces usa Face ID para abrir tu sesión sin contraseña."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "MyFinces usa el micrófono para que registres gastos e ingresos hablando.",
+          "speechRecognitionPermission": "MyFinces convierte lo que dices en un movimiento (monto, categoría y nota)."
+        }
       ]
     ],
     "experiments": {

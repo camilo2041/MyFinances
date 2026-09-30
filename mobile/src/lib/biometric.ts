@@ -20,9 +20,15 @@ export async function bioAvailable(): Promise<BioKind> {
   try {
     if (!(await LocalAuthentication.hasHardwareAsync()) || !(await LocalAuthentication.isEnrolledAsync())) return null;
     const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'face';
-    if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return 'fingerprint';
-    if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) return 'iris';
+    const has = (t: LocalAuthentication.AuthenticationType) => types.includes(t);
+    const { FINGERPRINT, FACIAL_RECOGNITION, IRIS } = LocalAuthentication.AuthenticationType;
+    if (Platform.OS === 'ios') return has(FACIAL_RECOGNITION) ? 'face' : 'fingerprint';
+    // Android: el aviso del sistema pide la huella cuando el teléfono la tiene
+    // (el rostro suele ser biometría "débil"), así que solo decimos "rostro"
+    // si no hay lector de huella.
+    if (has(FINGERPRINT)) return 'fingerprint';
+    if (has(FACIAL_RECOGNITION)) return 'face';
+    if (has(IRIS)) return 'iris';
     return 'fingerprint';
   } catch {
     return null;

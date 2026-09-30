@@ -12,7 +12,7 @@ import { Card, CountUp, Empty, ErrorLine, Kicker, Money, Press, Ring, T } from '
 import { invalidate, useApi, type Dashboard, type Debt, type Goal, type Recurring, type TrendPoint } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { catIcon } from '@/lib/catIcon';
-import { currentPeriod, dueInfo, greeting, periodLabel, short } from '@/lib/format';
+import { currentPeriod, debtDue, dueInfo, greeting, periodLabel, short } from '@/lib/format';
 import { storage } from '@/lib/storage';
 import { C, catColor, R } from '@/lib/theme';
 
@@ -22,6 +22,7 @@ const HIDE_KEY = 'myfinces_hide_amounts';
 
 const ACTIONS: { label: string; icon: IconName; go: () => void; primary?: boolean }[] = [
   { label: 'Gasto', icon: 'arrowDown', go: () => router.push({ pathname: '/nuevo', params: { kind: 'egreso' } }), primary: true },
+  { label: 'Voz', icon: 'mic', go: () => router.push({ pathname: '/nuevo', params: { voz: '1' } }) },
   { label: 'Ingreso', icon: 'arrowUp', go: () => router.push({ pathname: '/nuevo', params: { kind: 'ingreso' } }) },
   { label: 'Pagar', icon: 'calendar', go: () => router.navigate('/pagos') },
   { label: 'Metas', icon: 'piggy', go: () => router.navigate('/metas') },
@@ -55,8 +56,8 @@ export default function Home() {
     }
     for (const d of debts.data ?? []) {
       if (!d.active || d.remaining_installments <= 0 || d.paid_this_period) continue;
-      const due = dueInfo(d.due_day);
-      out.push({ key: `d${d.id}`, name: d.name, amount: d.installment_amount, days: d.overdue ? -d.days_overdue : due.days, overdue: d.overdue || due.overdue, kind: 'deuda', icon: 'bank' });
+      const due = debtDue(d.due_day, d.overdue, d.days_overdue);
+      out.push({ key: `d${d.id}`, name: d.name, amount: d.installment_amount, days: due.days, overdue: due.overdue, kind: 'deuda', icon: 'bank' });
     }
     return out.sort((a, b) => a.days - b.days);
   }, [recurring.data, debts.data]);
@@ -340,8 +341,8 @@ const styles = StyleSheet.create({
   deltaPill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.full, marginTop: 10 },
   cardBottom: { flexDirection: 'row', gap: 22, marginTop: 20 },
 
-  actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 6 },
-  action: { alignItems: 'center', gap: 7, width: 72 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 2 },
+  action: { alignItems: 'center', gap: 7, width: 62 },
   actionIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   actionPrimary: { backgroundColor: C.accent, borderColor: C.accent },
 

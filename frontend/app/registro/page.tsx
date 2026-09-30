@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { IconArrowRight } from "@/components/icons";
+import { isStrongPassword, PASSWORD_RULES } from "@/lib/password";
 
 export default function RegistroPage() {
   const { register } = useAuth();
@@ -15,7 +16,7 @@ export default function RegistroPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) return setErr("La contraseña debe tener al menos 6 caracteres");
+    if (!isStrongPassword(password)) return setErr("Tu contraseña aún no cumple todos los requisitos");
     setBusy(true);
     setErr(null);
     try {
@@ -47,7 +48,7 @@ export default function RegistroPage() {
           {[
             ["Tu nombre", name, setName, "text", "name", "Juan Pérez"],
             ["Correo electrónico", email, setEmail, "email", "email", "tucorreo@ejemplo.com"],
-            ["Contraseña", password, setPassword, "password", "new-password", "Mínimo 6 caracteres"],
+            ["Contraseña", password, setPassword, "password", "new-password", "Crea una contraseña segura"],
           ].map(([label, value, set, type, auto, ph]) => (
             <label key={label as string} className="mt-5 block">
               <span className="mb-1.5 block text-[12.5px] font-semibold text-[#c9c5e8]">{label as string}</span>
@@ -62,6 +63,26 @@ export default function RegistroPage() {
               />
             </label>
           ))}
+
+          {password && (
+            <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {PASSWORD_RULES.map((r) => {
+                const ok = r.test(password);
+                return (
+                  <li key={r.label} className={`flex items-center gap-1.5 text-[12.5px] ${ok ? "text-white" : "text-[#716c98]"}`}>
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${
+                        ok ? "border-[#a5b4fc] bg-[#a5b4fc] text-[#0e0c1c]" : "border-[#2c2850]"
+                      }`}
+                    >
+                      {ok ? "✓" : ""}
+                    </span>
+                    {r.label}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {err && <p className="mt-4 rounded-[12px] border border-[#e07a6f]/30 bg-[#e07a6f]/10 px-3.5 py-2.5 text-[13px] text-[#f0a79f]">{err}</p>}
 
