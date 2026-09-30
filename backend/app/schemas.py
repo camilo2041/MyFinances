@@ -58,6 +58,22 @@ class UserCreate(BaseModel):
         return _valid_email(v)
 
 
+class RegisterIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    email: str
+    password: str = Field(min_length=6)
+
+    @field_validator("email")
+    @classmethod
+    def _e(cls, v: str) -> str:
+        return _valid_email(v)
+
+    @field_validator("name")
+    @classmethod
+    def _n(cls, v: str) -> str:
+        return v.strip()
+
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[Role] = None

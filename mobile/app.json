@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "MyFinces",
+    "slug": "myfinces",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myfinces",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0e0c1c",
+    "ios": {
+      "bundleIdentifier": "site.barcam.myfinces",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "site.barcam.myfinces",
+      "adaptiveIcon": {
+        "backgroundColor": "#0e0c1c",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0e0c1c",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#6d5dfc",
+          "defaultChannel": "pagos"
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "MyFinces usa Face ID para abrir tu sesión sin contraseña."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0161780b-c2f9-44db-919f-8070306d3c1b"
+      }
+    },
+    "owner": "jbarragan2041"
+  }
+}

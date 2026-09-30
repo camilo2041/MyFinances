@@ -42,6 +42,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-myfinces}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-myfinces}}
       - SECRET_KEY=${SECRET_KEY:?Define SECRET_KEY en tu .env (ver .env.example)}
       - TOKEN_TTL_HOURS=${TOKEN_TTL_HOURS:-168}
+      - ALLOW_SIGNUP=${ALLOW_SIGNUP:-true}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@myfinces.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Define ADMIN_PASSWORD en tu .env (ver .env.example)}
       - DEMO_EMAIL=${DEMO_EMAIL:-}
