@@ -17,7 +17,7 @@ Requisitos: Docker Desktop y Node.js 18+.
 
 ```bash
 # una sola vez
-docker network create traefik-public
+docker network create traefik-net
 cp docker-compose.override.yml.example docker-compose.override.yml
 cp .env.example .env      # ajusta si quieres; los valores por defecto sirven en local
 
@@ -34,7 +34,8 @@ cd frontend && npm install && npm run dev
 
 ## Producción (Traefik)
 
-Requiere un Traefik ya corriendo con la red externa `traefik-public` y un
+Requiere un Traefik ya corriendo con la red externa `traefik-net` (otro nombre:
+define `TRAEFIK_NETWORK` en el `.env`) y un
 `certresolver` (ACME/Let's Encrypt). En el servidor:
 
 ```bash

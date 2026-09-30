@@ -3,7 +3,7 @@
 # sobre docker-compose.yml.
 #
 # Requisito (una sola vez):
-#     docker network create traefik-public
+#     docker network create traefik-net
 #
 # Uso normal en local:
 #     docker compose up -d            # levanta db + api (puerto 8010)
@@ -39,4 +39,4 @@ services:
     labels:
       - "traefik.enable=false"
 
-# La red externa se crea a mano en local (docker network create traefik-public).
+# La red externa se crea a mano en local (docker network create traefik-net).

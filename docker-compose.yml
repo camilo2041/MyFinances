@@ -1,7 +1,8 @@
 # Configuración base = PRODUCCIÓN (detrás de Traefik).
 #
 #   - Los servicios NO exponen puertos al host; el tráfico entra por Traefik
-#     usando la red externa "traefik-public" y TLS (certresolver).
+#     usando la red externa de Traefik (TRAEFIK_NETWORK, por defecto
+#     "traefik-net") y TLS (certresolver).
 #   - Postgres persiste en el volumen "db_data".
 #   - Los secretos son OBLIGATORIOS (${VAR:?...}): si faltan, `docker compose`
 #     se niega a arrancar en vez de desplegar con claves inseguras.
@@ -9,7 +10,7 @@
 # En LOCAL, copia "docker-compose.override.yml.example" a
 # "docker-compose.override.yml" (gitignored): expone puertos, activa
 # --reload y monta el código. Requiere una sola vez:
-#     docker network create traefik-public
+#     docker network create traefik-net
 
 services:
   db:
@@ -50,10 +51,10 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-https://${DOMAIN}}
     networks:
       - internal
-      - traefik-public
+      - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-net}"
       - "traefik.http.routers.myfinces-api.rule=Host(`${DOMAIN:?Define DOMAIN en tu .env}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.myfinces-api.entrypoints=websecure"
       - "traefik.http.routers.myfinces-api.tls=true"
@@ -73,10 +74,10 @@ services:
       - api
     networks:
       - internal
-      - traefik-public
+      - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-net}"
       - "traefik.http.routers.myfinces-web.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.myfinces-web.entrypoints=websecure"
       - "traefik.http.routers.myfinces-web.tls=true"
@@ -88,5 +89,7 @@ volumes:
 
 networks:
   internal:
-  traefik-public:
+  # Red donde corre Traefik en el servidor (compartida con otros proyectos).
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik-net}
     external: true
